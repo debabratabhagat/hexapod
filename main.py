@@ -1,4 +1,5 @@
 from adafruit_servokit import ServoKit
+import time
 
 # Initialize ServoKit instances for two PCA9685 boards
 board1 = ServoKit(channels=16, address=0x40)
@@ -98,3 +99,4 @@ if __name__ == "__main__":
     # Example: Set the standing position
     while True:
         stand_pos()
+        time.sleep(10)
