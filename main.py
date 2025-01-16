@@ -1,102 +1,162 @@
 from adafruit_servokit import ServoKit
 import time
+import numpy as np
 
 # Initialize ServoKit instances for two PCA9685 boards
 board1 = ServoKit(channels=16, address=0x40)
 board2 = ServoKit(channels=16, address=0x41)
 
-# Servo pulse range
-SERVOMIN = 125  # Minimum pulse length count
-SERVOMAX = 575  # Maximum pulse length count
+# Define servo pins for each leg
+LEG_SERVOS = {
+    "right1": {"coxa": 3, "femur": 7, "tibia": 6},
+    "right2": {"coxa": 5, "femur": 4, "tibia": 3},
+    "right3": {"coxa": 15, "femur": 14, "tibia": 13},
+    "left1": {"coxa": 13, "femur": 14, "tibia": 15},
+    "left2": {"coxa": 5, "femur": 4, "tibia": 3},
+    "left3": {"coxa": 6, "femur": 7, "tibia": 2},
+}
+
+UP_ANGLES = {
+    "right1": {"coxa": 80, "femur": 85, "tibia": 110},
+    "right2": {"coxa": 80, "femur": 80, "tibia": 90},
+    "right3": {"coxa": 70, "femur": 85, "tibia": 85},
+    "left1": {"coxa": 65, "femur": 70, "tibia": 85},
+    "left2": {"coxa": 75, "femur": 85, "tibia": 90},
+    "left3": {"coxa": 65, "femur": 80, "tibia": 85},
+}
 
 
-# Angle-to-pulse conversion function
-def angle_to_pulse(angle):
-    return int((SERVOMAX - SERVOMIN) * angle / 180 + SERVOMIN)
+# Define stance angles
+STANCE_ANGLES = {
+    "right1": {"coxa": 60, "femur": 90, "tibia": 100},
+    "right2": {"coxa": 70, "femur": 85, "tibia": 95},
+    "right3": {"coxa": 50, "femur": 90, "tibia": 90},
+    "left1": {"coxa": 70, "femur": 85, "tibia": 95},
+    "left2": {"coxa": 60, "femur": 90, "tibia": 100},
+    "left3": {"coxa": 50, "femur": 90, "tibia": 90},
+}
+
+# Offset for lift and swing phases
+LIFT_OFFSET = 30
+SWING_OFFSET = 30
 
 
-# Right leg functions
-def right_leg_1(i, angle):  # Right Leg 1 --> 0, 1, 2
-    if i == 2:
-        board1.servo[i + 5].angle = angle
-    else:
-        board2.servo[i - 1].angle = angle
+# Function to calculate lift and swing angles dynamically
+def calculate_dynamic_angles(stance_angles, lift_offset, swing_offset):
+    lift_angles = {}
+    swing_angles = {}
+
+    for leg, angles in stance_angles.items():
+        lift_angles[leg] = {
+            "coxa": angles["coxa"],
+            "femur": angles["femur"] - lift_offset,  # Lift femur up
+            "tibia": angles["tibia"] + lift_offset,  # Extend tibia
+        }
+        swing_angles[leg] = {
+            "coxa": angles["coxa"] + swing_offset
+            if "left" in leg
+            else angles["coxa"] - swing_offset,
+            "femur": angles["femur"],
+            "tibia": angles["tibia"],
+        }
+
+    return lift_angles, swing_angles
 
 
-def right_leg_2(i, angle):  # Right Leg 2 --> 3, 4, 5
-    board1.servo[i + 2].angle = angle
+# Calculate lift and swing angles
+LIFT_ANGLES, SWING_ANGLES = calculate_dynamic_angles(
+    STANCE_ANGLES, LIFT_OFFSET, SWING_OFFSET
+)
 
 
-def right_leg_3(i, angle):  # Right Leg 3 --> 13, 14, 15
-    board1.servo[i + 12].angle = angle
+def interpolate(start_angle, end_angle, steps):
+    return np.linspace(start_angle, end_angle, steps)
 
 
-# Left leg functions
-def left_leg_1(i, angle):  # Left Leg 1 --> 13, 14, 15
-    board2.servo[i + 12].angle = angle
+def move_smooth(board, pin, start_angle, end_angle, steps):
+    angles = interpolate(start_angle, end_angle, steps)
+    for angle in angles:
+        board.servo[pin].angle = angle
+        time.sleep(0.01)
 
 
-def left_leg_2(i, angle):  # Left Leg 2 --> 3, 4, 5
-    board2.servo[i + 2].angle = angle
+# Function to move a single servo
+def move_servo(board, pin, angle):
+    board.servo[pin].angle = angle
 
 
-def left_leg_3(i, angle):  # Left Leg 3 --> 6, 7, 2
-    if i == 3:
-        board2.servo[i - 1].angle = angle
-    else:
-        board2.servo[i + 5].angle = angle
+# Function to move a leg
+def move_leg_smooth(leg_name, start_angles, end_angles):
+    board = board1 if leg_name.startswith("right") else board2
+    pins = LEG_SERVOS[leg_name]
+
+    move_smooth(board, pins["coxa"], start_angles["coxa"], end_angles["coxa"], 10)
+    move_smooth(board, pins["femur"], start_angles["femur"], end_angles["femur"], 10)
+    move_smooth(board, pins["tibia"], start_angles["tibia"], end_angles["tibia"], 10)
 
 
-# Home positions
-# home_pos_RL11, home_pos_RL12, home_pos_RL13 = 80, 85, 110
-# home_pos_RL21, home_pos_RL22, home_pos_RL23 = 80, 80, 90
-# home_pos_RL31, home_pos_RL32, home_pos_RL33 = 70, 85, 85
-
-# home_pos_LL11, home_pos_LL12, home_pos_LL13 = 65, 70, 85
-# home_pos_LL21, home_pos_LL22, home_pos_LL23 = 75, 85, 90
-# home_pos_LL31, home_pos_LL32, home_pos_LL33 = 65, 80, 85
-home_pos_RL1 = [80, 85, 110]
-home_pos_RL2 = [80, 80, 90]
-home_pos_RL3 = [70, 85, 85]
-
-home_pos_LL1 = [65, 70, 85]
-home_pos_LL2 = [75, 85, 90]
-home_pos_LL3 = [65, 80, 85]
+# Function to set all legs to specific angles
+def set_leg_positions(angles):
+    for leg_name, angle_set in angles.items():
+        move_leg_smooth(leg_name, angle_set)
 
 
-# Function to set the standing position
-def stand_pos():
-    # Right leg
+# Tripod gait function
+def tripod_gait():
+    # Tripod groups
+    TRIPOD_1 = ["right1", "left2", "right3"]
+    TRIPOD_2 = ["left1", "right2", "left3"]
 
-    right_leg_1(1, home_pos_RL1[0])  # R1
-    right_leg_1(2, home_pos_RL1[1])
-    right_leg_1(3, home_pos_RL1[2])
+    while True:
+        # Move Tripod 1: Lift, Swing, Stand
+        for leg in TRIPOD_1:
+            move_leg_smooth(leg, STANCE_ANGLES[leg], LIFT_ANGLES[leg])
+        time.sleep(0.3)
 
-    right_leg_2(1, home_pos_RL2[0])  # R2
-    right_leg_2(2, home_pos_RL2[1])
-    right_leg_2(3, home_pos_RL2[2])
+        for leg in TRIPOD_1:
+            move_leg_smooth(leg, STANCE_ANGLES[leg], SWING_ANGLES[leg])
+        time.sleep(0.3)
 
-    right_leg_3(1, home_pos_RL3[0])  # R3
-    right_leg_3(2, home_pos_RL3[1])
-    right_leg_3(3, home_pos_RL3[2])
+        for leg in TRIPOD_1:
+            move_leg_smooth(leg, LIFT_ANGLES[leg], STANCE_ANGLES[leg])
+        time.sleep(0.3)
 
-    # Left leg
-    left_leg_1(1, home_pos_LL1[0])  # L1
-    left_leg_1(2, home_pos_LL1[1])
-    left_leg_1(3, home_pos_LL1[2])
+        # Move Tripod 2: Lift, Swing, Stand
+        for leg in TRIPOD_2:
+            move_leg_smooth(leg, STANCE_ANGLES[leg], LIFT_ANGLES[leg])
+        time.sleep(0.3)
 
-    left_leg_2(1, home_pos_LL2[0])  # L2
-    left_leg_2(2, home_pos_LL2[1])
-    left_leg_2(3, home_pos_LL2[2])
+        for leg in TRIPOD_2:
+            move_leg_smooth(leg, STANCE_ANGLES[leg], SWING_ANGLES[leg])
+        time.sleep(0.3)
 
-    left_leg_3(1, home_pos_LL3[0])  # L3
-    left_leg_3(2, home_pos_LL3[1])
-    left_leg_3(3, home_pos_LL3[2])
+        for leg in TRIPOD_2:
+            move_leg_smooth(leg, LIFT_ANGLES[leg], STANCE_ANGLES[leg])
+        time.sleep(0.3)
 
 
 # Main execution
 if __name__ == "__main__":
-    # Example: Set the standing position
-    while True:
-        stand_pos()
-        time.sleep(10)
+    try:
+        print("Starting hexapod movement...")
+        # Set all legs to initial standing position
+        set_leg_positions(UP_ANGLES)
+        time.sleep(2)
+        # set_leg_positions(STANCE_ANGLES)
+        # time.sleep(2)
+        # Begin tripod gait
+        # tripod_gait()
+    except KeyboardInterrupt:
+        print("Stopping hexapod.")
+
+        print("do you want to de power the servos?")
+        value = input("Enter y/n: ")
+
+        if value == "y":
+            print("De-powering servos...")
+            for i in range(16):
+                board1.servo[i].angle = None
+                board2.servo[i].angle = None
+            print("Servos de-powered.")
+        else:
+            print("Servos still powered.")
