@@ -25,7 +25,6 @@ UP_ANGLES = {
     "left3": {"coxa": 65, "femur": 80, "tibia": 85},
 }
 
-
 # Define stance angles
 STANCE_ANGLES = {
     "right1": {"coxa": 60, "femur": 90, "tibia": 100},
@@ -49,13 +48,14 @@ def calculate_dynamic_angles(stance_angles, lift_offset, swing_offset):
     for leg, angles in stance_angles.items():
         lift_angles[leg] = {
             "coxa": angles["coxa"],
-            "femur": angles["femur"] - lift_offset,  # Lift femur up
+            "femur": angles["femur"] + lift_offset,  # Lift femur up
             "tibia": angles["tibia"] + lift_offset,  # Extend tibia
         }
         swing_angles[leg] = {
             "coxa": angles["coxa"] + swing_offset
             if "left" in leg
             else angles["coxa"] - swing_offset,
+            
             "femur": angles["femur"],
             "tibia": angles["tibia"],
         }
@@ -95,10 +95,19 @@ def move_leg_smooth(leg_name, start_angles, end_angles):
     move_smooth(board, pins["tibia"], start_angles["tibia"], end_angles["tibia"], 10)
 
 
+def move_leg(leg_name, angles):
+    board = board1 if leg_name.startswith("right") else board2
+    pins = LEG_SERVOS[leg_name]
+
+    move_servo(board, pins["coxa"], angles["coxa"])
+    move_servo(board, pins["femur"], angles["femur"])
+    move_servo(board, pins["tibia"], angles["tibia"])
+
+
 # Function to set all legs to specific angles
 def set_leg_positions(angles):
     for leg_name, angle_set in angles.items():
-        move_leg_smooth(leg_name, angle_set)
+        move_leg(leg_name, angle_set)
 
 
 # Tripod gait function

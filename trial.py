@@ -1,158 +1,221 @@
-from adafruit_servokit import ServoKit
 import time
-import numpy as np
+from adafruit_servokit import ServoKit
 
 # Initialize ServoKit instances for two PCA9685 boards
 board1 = ServoKit(channels=16, address=0x40)
 board2 = ServoKit(channels=16, address=0x41)
 
-# Servo pulse range
-SERVOMIN = 125  # Minimum pulse length count
-SERVOMAX = 575  # Maximum pulse length count
+
+# Define servo pins for each leg
+LEG_SERVOS = {
+    "right1": {"coxa": 9, "femur": 8, "tibia": 7},
+    "right2": {"coxa": 12, "femur": 11, "tibia": 10},
+    "right3": {"coxa": 15, "femur": 14, "tibia": 13},
+    "left1": {"coxa": 15, "femur": 14, "tibia": 13},
+    "left2": {"coxa": 12, "femur": 11, "tibia": 10},
+    "left3": {"coxa": 9, "femur": 8, "tibia": 7},
+}
+
+# Constants for custom servo pulse range (for first 4 motors)
+CUSTOM_SERVOMIN = 550  # Custom minimum pulse length
+CUSTOM_SERVOMAX = 2400  # Custom maximum pulse length
 
 
-# Angle-to-pulse conversion function
-def angle_to_pulse(angle):
-    return int((SERVOMAX - SERVOMIN) * angle / 180 + SERVOMIN)
+# Function to map angle (0-180) to pulse width (125-575)
+def angle_to_pulse(angle, min_pulse, max_pulse):
+    pulse = min_pulse + (angle * (max_pulse - min_pulse) // 180)
+    return pulse
 
 
-# Right leg functions
-def right_leg_1(i, angle):  # Right Leg 1 --> 0, 1, 2
-    if i == 2 or i == 1:
-        board1.servo[i + 5].angle = angle
+# Function to set servo angle
+def set_servo_angle(leg, joint, angle):
+    # Validate angle range
+    if angle < 0 or angle > 180:
+        raise ValueError(f"Angle must be between 0 and 180 degrees. Got: {angle}")
+
+    # Select the correct board
+    if leg in ["right1", "right2", "right3"]:
+        board = board1
     else:
-        board2.servo[i - 1].angle = angle
+        board = board2
+
+    pin = LEG_SERVOS[leg][joint]
+
+    try:
+        # Set the pulse width range
+        #         board.servo[pin].set_pulse_width_range(CUSTOM_SERVOMIN, CUSTOM_SERVOMAX)
+        # Use the correct board variable here (was using board1 always)
+        board.servo[pin].angle = angle
+    except Exception as e:
+        print(f"Error setting servo angle for {leg} {joint}: {e}")
 
 
-def right_leg_2(i, angle):  # Right Leg 2 --> 3, 4, 5
-    board1.servo[i + 2].angle = angle
+# Initialize movement variables
+FM1 = FM2 = FM3 = FM4 = FM5 = FM6 = FM7 = FM8 = 0
+Impair_start = False
 
 
-def right_leg_3(i, angle):  # Right Leg 3 --> 13, 14, 15
-    board1.servo[i + 12].angle = angle
+# Stand position
+def up_pos():
+    set_servo_angle("right1", "coxa", 100)
+    set_servo_angle("right1", "femur", 100)  # + = +
+    set_servo_angle("right1", "tibia", 90)  # + = -
+
+    set_servo_angle("right2", "coxa", 95)
+    set_servo_angle("right2", "femur", 110)
+    set_servo_angle("right2", "tibia", 90)
+
+    set_servo_angle("right3", "coxa", 90)
+    set_servo_angle("right3", "femur", 95)
+    set_servo_angle("right3", "tibia", 90)
+
+    set_servo_angle("left1", "coxa", 95)
+    set_servo_angle("left1", "femur", 85)
+    set_servo_angle("left1", "tibia", 90)
+
+    set_servo_angle("left2", "coxa", 90)
+    set_servo_angle("left2", "femur", 85)
+    set_servo_angle("left2", "tibia", 110)
+
+    set_servo_angle("left3", "coxa", 90)
+    set_servo_angle("left3", "femur", 95)
+    set_servo_angle("left3", "tibia", 90)
 
 
-# Left leg functions
-def left_leg_1(i, angle):  # Left Leg 1 --> 13, 14, 15
-    board2.servo[i + 12].angle = angle
+def stand_pos():
+    set_servo_angle("right1", "coxa", 100)
+    set_servo_angle("right1", "femur", 145)  # + = +
+    set_servo_angle("right1", "tibia", 140)  # + = -
+
+    set_servo_angle("right2", "coxa", 95)
+    set_servo_angle("right2", "femur", 140)
+    set_servo_angle("right2", "tibia", 125)
+
+    set_servo_angle("right3", "coxa", 90)
+    set_servo_angle("right3", "femur", 135)
+    set_servo_angle("right3", "tibia", 150)
+
+    set_servo_angle("left1", "coxa", 95)
+    set_servo_angle("left1", "femur", 135)
+    set_servo_angle("left1", "tibia", 140)
+
+    set_servo_angle("left2", "coxa", 90)
+    set_servo_angle("left2", "femur", 125)
+    set_servo_angle("left2", "tibia", 150)
+
+    set_servo_angle("left3", "coxa", 90)
+    set_servo_angle("left3", "femur", 140)
+    set_servo_angle("left3", "tibia", 145)
 
 
-def left_leg_2(i, angle):  # Left Leg 2 --> 3, 4, 5
-    board2.servo[i + 2].angle = angle
+# Move forward function
 
 
-def left_leg_3(i, angle):  # Left Leg 3 --> 6, 7, 2
-    if i == 3:
-        board2.servo[i - 1].angle = angle
-    else:
-        board2.servo[i + 5].angle = angle
+def move_forward():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 + FM2)
+
+        set_servo_angle("right3", "coxa", 90 + FM2)
+
+        set_servo_angle("left2", "coxa", 90 - FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 - FM4)
+        set_servo_angle("right3", "coxa", 130 - FM4)
+        set_servo_angle("left2", "coxa", 50 + FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 + FM6)
+            set_servo_angle("left1", "coxa", 95 - FM6)
+            set_servo_angle("left3", "coxa", 90 - FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 - FM8)
+            set_servo_angle("left1", "coxa", 55 + FM8)
+            set_servo_angle("left3", "coxa", 50 + FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
 
 
-# home_pos_RL1 = [80, 85, 110]
-# home_pos_RL2 = [80, 80, 90]
-# home_pos_RL3 = [70, 85, 85]
+# Main loop
+def main():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    while True:
+        move_forward()
+        #         key = input("Enter command (W=Up, S=Down, A=Left, D=Right, Q=Exit): ").upper()
 
-# home_pos_LL1 = [65, 70, 85]
-# home_pos_LL2 = [75, 85, 90]
-# home_pos_LL3 = [65, 80, 85]
+        #         if key == "W":
+        #             move_forward()
+        #         elif key == "S":
+        #             pass  # Implement backward or another movement if necessary
+        #         elif key == "A":
+        #             pass  # Implement left movement
+        #         elif key == "D":
+        #             pass  # Implement right movement
+        #         elif key == "Q":
+        #             break
 
-# def stand_pos():
-#     # Right leg
-
-#     right_leg_1(1, home_pos_RL1[0])  # R1
-#     right_leg_1(2, home_pos_RL1[1])
-#     right_leg_1(3, home_pos_RL1[2])
-
-#     right_leg_2(1, home_pos_RL2[0])  # R2
-#     right_leg_2(2, home_pos_RL2[1])
-#     right_leg_2(3, home_pos_RL2[2])
-
-#     right_leg_3(1, home_pos_RL3[0])  # R3
-#     right_leg_3(2, home_pos_RL3[1])
-#     right_leg_3(3, home_pos_RL3[2])
-
-#     # Left leg
-#     left_leg_1(1, home_pos_LL1[0])  # L1
-#     left_leg_1(2, home_pos_LL1[1])
-#     left_leg_1(3, home_pos_LL1[2])
-
-#     left_leg_2(1, home_pos_LL2[0])  # L2
-#     left_leg_2(2, home_pos_LL2[1])
-#     left_leg_2(3, home_pos_LL2[2])
-
-#     left_leg_3(1, home_pos_LL3[0])  # L3
-#     left_leg_3(2, home_pos_LL3[1])
-#     left_leg_3(3, home_pos_LL3[2])
+        time.sleep(0.007)
 
 
-rl_pins = [[6, 7, 2], [3, 4, 5], [13, 14, 15]]
-ll_pins = [[13, 14, 15], [3, 4, 5], [6, 7, 2]]
-
-up_pos_RL = [[80, 85, 110], [80, 80, 90], [70, 85, 85]]
-up_pos_LL = [[65, 70, 85], [75, 85, 90], [65, 80, 85]]
-
-
-def leg_position(rl_pins, ll_pins, Rl_angles, Ll_angles):
-    for i in range(3):
-        right_leg_1(rl_pins[0][i], Rl_angles[0][i])
-        right_leg_2(rl_pins[1][i], Rl_angles[1][i])
-        right_leg_3(rl_pins[2][i], Rl_angles[2][i])
-
-        left_leg_1(ll_pins[0][i], Ll_angles[0][i])
-        left_leg_2(ll_pins[1][i], Ll_angles[1][i])
-        left_leg_3(ll_pins[2][i], Ll_angles[2][i])
-
-
-# Hexapod dimensions (in mm)
-COXA_LENGTH = 59  # Distance from body to femur joint
-FEMUR_LENGTH = 71  # Upper leg length
-TIBIA_LENGTH = 166  # Lower leg length
-
-
-# Inverse kinematics function
-def inverse_kinematics(x, y, z):
-    h = np.sqrt(np.square(x) + np.square(y))
-    h = max(h, 0.1)
-    l = np.sqrt(np.square(h) + np.square(z))
-
-    coxa_angle = np.degrees(np.arctan2(y, x))
-
-    femur_angle = 90 - np.degrees(
-        np.arctan2(z, h)
-        + np.arccos(np.square(FEMUR_LENGTH) + np.square(l) - np.square(TIBIA_LENGTH))
-        / (2 * FEMUR_LENGTH * l)
-    )
-
-    tibia_angle = np.degrees(
-        np.arccos(
-            (np.square(FEMUR_LENGTH) + np.square(TIBIA_LENGTH) - np.square(l))
-            / (2 * FEMUR_LENGTH * TIBIA_LENGTH)
-        )
-    )
-
-    return coxa_angle, femur_angle, tibia_angle
-
-
-# Main execution
 if __name__ == "__main__":
-    # Example: Set the standing position
-    # while True:
-    leg_position(rl_pins, ll_pins, up_pos_RL, up_pos_LL)
-    time.sleep(10)
-    # Standing position
-    delta = 30
-    stand_pos_rl = [
-        [80 - delta, 85 - delta, 110 + delta],
-        [80 + delta, 80 + delta, 90 - delta],
-        [70 - delta, 85 + delta, 85 - delta],
-    ]
-    stand_pos_ll = [
-        [65 + delta, 70 + delta, 85 - delta],
-        [75 - delta, 85 - delta, 90 + delta],
-        [65 + delta, 80 - delta, 85 + delta],
-    ]
-
-    leg_position(rl_pins, ll_pins, stand_pos_rl, stand_pos_ll)
-    time.sleep(10)
-
-    # forward
+    stand_pos()
+    time.sleep(2)  # Set initial position
+    main()
+#     stand_pos()
