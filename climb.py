@@ -28,6 +28,70 @@ def set_servo_angle(leg, joint, target_angle, duration=1.0, steps=50):
         time.sleep(duration / steps)
 
 
+def up_pos():
+    set_servo_angle("right1", "coxa", 100)
+    set_servo_angle("right1", "femur", 100)  # + = +
+    set_servo_angle("right1", "tibia", 90)  # + = -
+
+    set_servo_angle("right2", "coxa", 95)
+    set_servo_angle("right2", "femur", 110)
+    set_servo_angle("right2", "tibia", 90)
+
+    set_servo_angle("right3", "coxa", 90)
+    set_servo_angle("right3", "femur", 95)
+    set_servo_angle("right3", "tibia", 90)
+
+    set_servo_angle("left1", "coxa", 95)
+    set_servo_angle("left1", "femur", 85)
+    set_servo_angle("left1", "tibia", 90)
+
+    set_servo_angle("left2", "coxa", 90)
+    set_servo_angle("left2", "femur", 85)
+    set_servo_angle("left2", "tibia", 110)
+
+    set_servo_angle("left3", "coxa", 90)
+    set_servo_angle("left3", "femur", 95)
+    set_servo_angle("left3", "tibia", 90)
+
+
+stand_pos_angles = {
+    # right legs
+    "right1": {"coxa": 100, "femur": 145, "tibia": 140},
+    "right2": {"coxa": 95, "femur": 140, "tibia": 125},
+    "right3": {"coxa": 90, "femur": 135, "tibia": 150},
+    # left legs
+    "left1": {"coxa": 95, "femur": 135, "tibia": 140},
+    "left2": {"coxa": 90, "femur": 125, "tibia": 150},
+    "left3": {"coxa": 90, "femur": 140, "tibia": 145},
+}
+
+
+def stand_pos():
+    set_servo_angle("right1", "coxa", stand_pos_angles["right1"]["coxa"])
+    set_servo_angle("right1", "femur", stand_pos_angles["right1"]["femur"])  # + = +
+    set_servo_angle("right1", "tibia", stand_pos_angles["right1"]["tibia"])  # + = -
+
+    set_servo_angle("right2", "coxa", stand_pos_angles["right2"]["coxa"])
+    set_servo_angle("right2", "femur", stand_pos_angles["right2"]["femur"])  # + = +
+    set_servo_angle("right2", "tibia", stand_pos_angles["right2"]["tibia"])  # + = -
+
+    set_servo_angle("right3", "coxa", stand_pos_angles["right3"]["coxa"])
+    set_servo_angle("right3", "femur", stand_pos_angles["right3"]["femur"])  # + = +
+    set_servo_angle("right3", "tibia", stand_pos_angles["right3"]["tibia"])  # + = -
+
+    set_servo_angle("left1", "coxa", stand_pos_angles["left1"]["coxa"])
+    set_servo_angle("left1", "femur", stand_pos_angles["left1"]["femur"])  # + = +
+    set_servo_angle("left1", "tibia", stand_pos_angles["left1"]["tibia"])  # + = -
+
+    set_servo_angle("left2", "coxa", stand_pos_angles["left2"]["coxa"])
+    set_servo_angle("left2", "femur", stand_pos_angles["left2"]["femur"])  # + = +
+    set_servo_angle("left2", "tibia", stand_pos_angles["left2"]["tibia"])  # + = -
+
+    set_servo_angle("left3", "coxa", stand_pos_angles["left3"]["coxa"])
+    set_servo_angle("left3", "femur", stand_pos_angles["left3"]["femur"])  # + = +
+    set_servo_angle("left3", "tibia", stand_pos_angles["left3"]["tibia"])  # + = -
+
+
 # Step 1: Adjust balance by moving middle legs forward
 def adjust_balance():
     set_servo_angle("right2", "femur", 120)
@@ -89,31 +153,19 @@ def move_body_forward():
     set_servo_angle("left2", "coxa", 90)
 
 
-# # Step 4: Place middle legs on stair
-# def middle_legs_climb():
-#     lift_leg("right2", 90, 120, 120)
-#     place_leg("right2", 110, 100, 50)
-
-#     lift_leg("left2", 90, 120, 120)
-#     place_leg("left2", 70, 100, 50)
+# Step 4: Place middle legs on stair
+def middle_legs_climb():
+    pass
 
 
-# # Step 5: Move body forward again
-# def final_body_forward():
-#     lift_leg("right3", 90, 120, 120)
-#     place_leg("right3", 90, 90, 90)
-
-#     lift_leg("left3", 90, 120, 120)
-#     place_leg("left3", 90, 90, 90)
+# Step 5: Move body forward again
+def final_body_forward():
+    pass
 
 
-# # Step 6: Place rear legs on stair
-# def rear_legs_climb():
-#     lift_leg("right3", 90, 120, 120)
-#     place_leg("right3", 110, 100, 50)
-
-#     lift_leg("left3", 90, 120, 120)
-#     place_leg("left3", 70, 100, 50)
+# Step 6: Place rear legs on stair
+def rear_legs_climb():
+    pass
 
 
 # Execute the stair climbing sequence
