@@ -1,5 +1,5 @@
 import numpy as np
-from adafruit import ServoKit
+from adafruit_servokit import ServoKit
 import time
 
 # Define servo boards
@@ -18,7 +18,7 @@ LEG_SERVOS = {
 
 
 # Function to set servo angles smoothly
-def set_servo_angle(leg, joint, target_angle, duration=1.0, steps=50):
+def set_servo_angle(leg, joint, target_angle, duration=0.5, steps=20):
     board = board1 if "right" in leg else board2
     pin = LEG_SERVOS[leg][joint]
     current_angle = board.servo[pin].angle or 90
@@ -94,63 +94,128 @@ def stand_pos():
 
 # Step 1: Adjust balance by moving middle legs forward
 def adjust_balance():
-    set_servo_angle("right2", "femur", 120)
-    set_servo_angle("left2", "femur", 120)
+    set_servo_angle("right2", "femur", 130)
+    set_servo_angle("right2", "tibia", 80)
+    set_servo_angle("left2", "femur", 115)
 
-    set_servo_angle("right2", "coxa", 60)
-    set_servo_angle("left2", "coxa", 120)
+    set_servo_angle("right2", "coxa", 135)
+    set_servo_angle("left2", "coxa", 45)
 
-    set_servo_angle("right2", "femur", 90)
-    set_servo_angle("left2", "femur", 90)
+    set_servo_angle("right2", "femur", 110)
+    set_servo_angle("left2", "femur", 85)
 
 
 # Step 2: Place front legs on stair
 def front_legs_climb():
-    set_servo_angle("right1", "femur", 150)
-    set_servo_angle("right1", "tibia", 120)
-    set_servo_angle("right1", "coxa", 45)
+    # Define target angles
+    right1_targets = {"coxa": [90, 75], "femur": [100, 180], "tibia": [90, 160]}
+    left1_targets = {"coxa": [95, 110], "femur": [85, 165], "tibia": [90, 160]}
+
+    steps = 20  # Number of interpolation steps
+    duration = 0.01  # Total duration for each movement
+
+    # Interpolate angles for right1 leg
+    for coxa_angle, femur_angle, tibia_angle in zip(
+        np.linspace(right1_targets["coxa"][0], right1_targets["coxa"][1], steps),
+        np.linspace(right1_targets["femur"][0], right1_targets["femur"][1], steps),
+        np.linspace(right1_targets["tibia"][0], right1_targets["tibia"][1], steps),
+    ):
+        set_servo_angle("right1", "femur", femur_angle, duration / steps)
+        set_servo_angle("right1", "tibia", tibia_angle, duration / steps)
+        set_servo_angle("right1", "coxa", coxa_angle, duration / steps)
 
     time.sleep(0.5)
 
-    set_servo_angle("right1", "femur", 120)
-    set_servo_angle("right1", "tibia", 160)
+    set_servo_angle("right1", "tibia", 70)
+    set_servo_angle("right1", "coxa", 135)
+
+    set_servo_angle("right1", "tibia", 90)
+
+    for coxa_angle, femur_angle, tibia_angle in zip(
+        np.linspace(left1_targets["coxa"][0], left1_targets["coxa"][1], steps),
+        np.linspace(left1_targets["femur"][0], left1_targets["femur"][1], steps),
+        np.linspace(left1_targets["tibia"][0], left1_targets["tibia"][1], steps),
+    ):
+        set_servo_angle("left1", "femur", femur_angle, duration / steps)
+        set_servo_angle("left1", "tibia", tibia_angle, duration / steps)
+        set_servo_angle("left1", "coxa", coxa_angle, duration / steps)
 
     time.sleep(0.5)
 
-    set_servo_angle("left1", "femur", 150)
-    set_servo_angle("left1", "tibia", 120)
-    set_servo_angle("left1", "coxa", 45)
+    set_servo_angle("left1", "tibia", 70)
+    set_servo_angle("left1", "coxa", 50)
 
-    time.sleep(0.5)
-
-    set_servo_angle("left1", "femur", 120)
-    set_servo_angle("left1", "tibia", 160)
+    set_servo_angle("left1", "tibia", 90)
 
 
 # Step 3: Move body forward
 def move_body_forward():
-    set_servo_angle("right3", "femur", 120)
+    set_servo_angle("right3", "femur", 120)  # 95 --> 120
     set_servo_angle("right3", "tibia", 120)
-    set_servo_angle("right3", "coxa", 60)
+    set_servo_angle("right3", "coxa", 120)
 
     time.sleep(0.5)
-    set_servo_angle("right3", "femur", 90)
+    set_servo_angle("right3", "femur", 95)
     set_servo_angle("right3", "tibia", 90)
 
-    time.sleep(0.5)
-    set_servo_angle("left3", "femur", 120)
-    set_servo_angle("left3", "tibia", 120)
-    set_servo_angle("left3", "coxa", 120)
+    # right2
+    set_servo_angle("right2", "femur", 140)  # 95 --> 120
+    set_servo_angle("right2", "tibia", 120)
+    set_servo_angle("right2", "coxa", 125)
 
     time.sleep(0.5)
-    set_servo_angle("left3", "femur", 90)
+    set_servo_angle("right2", "femur", 110)
+    set_servo_angle("right2", "tibia", 90)
+
+    # right3
+    time.sleep(0.5)
+    set_servo_angle("right1", "tibia", 70)
+    set_servo_angle("right1", "femur", 165)
+
+    # left3
+    set_servo_angle("left3", "femur", 125)  # 95 --> 120
+    set_servo_angle("left3", "tibia", 120)
+    set_servo_angle("left3", "coxa", 65)
+
+    time.sleep(0.5)
+    set_servo_angle("left3", "femur", 95)
     set_servo_angle("left3", "tibia", 90)
 
+    # left2
+    set_servo_angle("left2", "femur", 115)  # 95 --> 120
+    set_servo_angle("left2", "tibia", 140)
+    set_servo_angle("left2", "coxa", 60)
+
     time.sleep(0.5)
-    set_servo_angle("right3", "coxa", 90)
-    set_servo_angle("left3", "coxa", 90)
-    set_servo_angle("right2", "coxa", 90)
-    set_servo_angle("left2", "coxa", 90)
+    set_servo_angle("left2", "femur", 85)
+    set_servo_angle("left2", "tibia", 110)
+
+    # left3
+    time.sleep(0.5)
+    set_servo_angle("left1", "tibia", 70)
+    set_servo_angle("left1", "femur", 165)
+
+    # right1
+    coxa_angles = {
+        "right2": [120, 90],
+        "right3": [125, 95],
+        "left2": [60, 90],
+        "left3": [65, 90],
+    }
+
+    duration = 0.5
+    steps = 20
+    # coxa
+    for right2, right3, left2, left3 in zip(
+        np.linspace(coxa_angles["right2"][0], coxa_angles["right2"][1], steps),
+        np.linspace(coxa_angles["right3"][0], coxa_angles["right3"][1], steps),
+        np.linspace(coxa_angles["left2"][0], coxa_angles["left2"][1], steps),
+        np.linspace(coxa_angles["left3"][0], coxa_angles["left3"][1], steps),
+    ):
+        set_servo_angle("right3", "coxa", right3, duration / steps)
+        set_servo_angle("right2", "coxa", right2, duration / steps)
+        set_servo_angle("left2", "coxa", left2, duration / steps)
+        set_servo_angle("left3", "coxa", left3, duration / steps)
 
 
 # Step 4: Place middle legs on stair
@@ -170,23 +235,13 @@ def rear_legs_climb():
 
 # Execute the stair climbing sequence
 def climb_stair():
+    up_pos()
+    time.sleep(0.05)
+
     print("Adjusting balance...")
     adjust_balance()
 
-    print("Climbing front legs...")
     front_legs_climb()
-
-    print("Moving body forward...")
-    move_body_forward()
-
-    print("Climbing middle legs...")
-    middle_legs_climb()
-
-    print("Final forward movement...")
-    final_body_forward()
-
-    print("Climbing rear legs...")
-    rear_legs_climb()
 
 
 # Run the climbing routine

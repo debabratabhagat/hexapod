@@ -1,5 +1,6 @@
 import time
 from adafruit_servokit import ServoKit
+import keyboard
 
 # Initialize ServoKit instances for two PCA9685 boards
 board1 = ServoKit(channels=16, address=0x40)
@@ -193,23 +194,289 @@ def move_forward():
             FM5 = FM6 = FM7 = FM8 = 0
 
 
-# Main loop
+def move_backward():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 - FM2)
+
+        set_servo_angle("right3", "coxa", 90 - FM2)
+
+        set_servo_angle("left2", "coxa", 90 + FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 + FM4)
+        set_servo_angle("right3", "coxa", 130 + FM4)
+        set_servo_angle("left2", "coxa", 50 - FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 - FM6)
+            set_servo_angle("left1", "coxa", 95 + FM6)
+            set_servo_angle("left3", "coxa", 90 + FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 + FM8)
+            set_servo_angle("left1", "coxa", 55 - FM8)
+            set_servo_angle("left3", "coxa", 50 - FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def rotate_right():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 - FM2)
+
+        set_servo_angle("right3", "coxa", 90 - FM2)
+
+        set_servo_angle("left2", "coxa", 90 - FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 + FM4)
+        set_servo_angle("right3", "coxa", 130 + FM4)
+        set_servo_angle("left2", "coxa", 50 + FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 - FM6)
+            set_servo_angle("left1", "coxa", 95 - FM6)
+            set_servo_angle("left3", "coxa", 90 - FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 + FM8)
+            set_servo_angle("left1", "coxa", 55 + FM8)
+            set_servo_angle("left3", "coxa", 50 + FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def rotate_left():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 + FM2)
+
+        set_servo_angle("right3", "coxa", 90 + FM2)
+
+        set_servo_angle("left2", "coxa", 90 + FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 - FM4)
+        set_servo_angle("right3", "coxa", 130 - FM4)
+        set_servo_angle("left2", "coxa", 50 - FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 + FM6)
+            set_servo_angle("left1", "coxa", 95 + FM6)
+            set_servo_angle("left3", "coxa", 90 + FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 - FM8)
+            set_servo_angle("left1", "coxa", 55 - FM8)
+            set_servo_angle("left3", "coxa", 50 - FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def display_menu():
+    print("\n--- Robot Control Menu ---")
+    print("W: Move Forward")
+    print("S: Move Backward ")
+    print("A: Move Left (not implemented)")
+    print("D: Move Right (not implemented)")
+    print("Ctrl+S: Set Stand Position")
+    print("Ctrl+U: Set Up Position")
+    print("Q: Quit the Program")
+    print("---------------------------\n")
+
+
 def main():
     global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
-    while True:
-        move_forward()
-        #         key = input("Enter command (W=Up, S=Down, A=Left, D=Right, Q=Exit): ").upper()
+    # Display the control menu
+    display_menu()
 
-        #         if key == "W":
-        #             move_forward()
-        #         elif key == "S":
-        #             pass  # Implement backward or another movement if necessary
-        #         elif key == "A":
-        #             pass  # Implement left movement
-        #         elif key == "D":
-        #             pass  # Implement right movement
-        #         elif key == "Q":
-        #             break
+    while True:
+        if keyboard.is_pressed("w"):
+            move_forward()
+        elif keyboard.is_pressed("s"):
+            move_backward()  # Implement backward or another movement if necessary
+        elif keyboard.is_pressed("a"):
+            rotate_left()  # Implement left movement
+        elif keyboard.is_pressed("d"):
+            rotate_right()  # Implement right movement
+        elif keyboard.is_pressed("j"):
+            print("Setting Stand Position...")
+            stand_pos()
+        elif keyboard.is_pressed("k"):
+            print("Setting Up Position...")
+            up_pos()
+        elif keyboard.is_pressed("q"):
+            print("Exiting program...")
+            break
+
+        time.sleep(0.007)  # Small delay to reduce CPU usage
 
         time.sleep(0.007)
 
