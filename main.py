@@ -1,171 +1,492 @@
-from adafruit_servokit import ServoKit
 import time
-import numpy as np
+from adafruit_servokit import ServoKit
+import keyboard
+from climb import climb_stair
 
 # Initialize ServoKit instances for two PCA9685 boards
 board1 = ServoKit(channels=16, address=0x40)
 board2 = ServoKit(channels=16, address=0x41)
 
+
 # Define servo pins for each leg
 LEG_SERVOS = {
-    "right1": {"coxa": 3, "femur": 7, "tibia": 6},
-    "right2": {"coxa": 5, "femur": 4, "tibia": 3},
+    "right1": {"coxa": 9, "femur": 8, "tibia": 7},
+    "right2": {"coxa": 12, "femur": 11, "tibia": 10},
     "right3": {"coxa": 15, "femur": 14, "tibia": 13},
-    "left1": {"coxa": 13, "femur": 14, "tibia": 15},
-    "left2": {"coxa": 5, "femur": 4, "tibia": 3},
-    "left3": {"coxa": 6, "femur": 7, "tibia": 2},
+    "left1": {"coxa": 15, "femur": 14, "tibia": 13},
+    "left2": {"coxa": 12, "femur": 11, "tibia": 10},
+    "left3": {"coxa": 9, "femur": 8, "tibia": 7},
 }
 
-UP_ANGLES = {
-    "right1": {"coxa": 80, "femur": 85, "tibia": 110},
-    "right2": {"coxa": 80, "femur": 80, "tibia": 90},
-    "right3": {"coxa": 70, "femur": 85, "tibia": 85},
-    "left1": {"coxa": 65, "femur": 70, "tibia": 85},
-    "left2": {"coxa": 75, "femur": 85, "tibia": 90},
-    "left3": {"coxa": 65, "femur": 80, "tibia": 85},
-}
-
-# Define stance angles
-STANCE_ANGLES = {
-    "right1": {"coxa": 60, "femur": 90, "tibia": 100},
-    "right2": {"coxa": 70, "femur": 85, "tibia": 95},
-    "right3": {"coxa": 50, "femur": 90, "tibia": 90},
-    "left1": {"coxa": 70, "femur": 85, "tibia": 95},
-    "left2": {"coxa": 60, "femur": 90, "tibia": 100},
-    "left3": {"coxa": 50, "femur": 90, "tibia": 90},
-}
-
-# Offset for lift and swing phases
-LIFT_OFFSET = 30
-SWING_OFFSET = 30
+# Constants for custom servo pulse range (for first 4 motors)
+CUSTOM_SERVOMIN = 550  # Custom minimum pulse length
+CUSTOM_SERVOMAX = 2400  # Custom maximum pulse length
 
 
-# Function to calculate lift and swing angles dynamically
-def calculate_dynamic_angles(stance_angles, lift_offset, swing_offset):
-    lift_angles = {}
-    swing_angles = {}
-
-    for leg, angles in stance_angles.items():
-        lift_angles[leg] = {
-            "coxa": angles["coxa"],
-            "femur": angles["femur"] + lift_offset,  # Lift femur up
-            "tibia": angles["tibia"] + lift_offset,  # Extend tibia
-        }
-        swing_angles[leg] = {
-            "coxa": angles["coxa"] + swing_offset
-            if "left" in leg
-            else angles["coxa"] - swing_offset,
-            
-            "femur": angles["femur"],
-            "tibia": angles["tibia"],
-        }
-
-    return lift_angles, swing_angles
+# Function to map angle (0-180) to pulse width (125-575)
+def angle_to_pulse(angle, min_pulse, max_pulse):
+    pulse = min_pulse + (angle * (max_pulse - min_pulse) // 180)
+    return pulse
 
 
-# Calculate lift and swing angles
-LIFT_ANGLES, SWING_ANGLES = calculate_dynamic_angles(
-    STANCE_ANGLES, LIFT_OFFSET, SWING_OFFSET
-)
+# Function to set servo angle
+def set_servo_angle(leg, joint, angle):
+    # Validate angle range
+    if angle < 0 or angle > 180:
+        raise ValueError(f"Angle must be between 0 and 180 degrees. Got: {angle}")
 
+    # Select the correct board
+    if leg in ["right1", "right2", "right3"]:
+        board = board1
+    else:
+        board = board2
 
-def interpolate(start_angle, end_angle, steps):
-    return np.linspace(start_angle, end_angle, steps)
+    pin = LEG_SERVOS[leg][joint]
 
-
-def move_smooth(board, pin, start_angle, end_angle, steps):
-    angles = interpolate(start_angle, end_angle, steps)
-    for angle in angles:
+    try:
+        # Set the pulse width range
+        #         board.servo[pin].set_pulse_width_range(CUSTOM_SERVOMIN, CUSTOM_SERVOMAX)
+        # Use the correct board variable here (was using board1 always)
         board.servo[pin].angle = angle
-        time.sleep(0.01)
+    except Exception as e:
+        print(f"Error setting servo angle for {leg} {joint}: {e}")
 
 
-# Function to move a single servo
-def move_servo(board, pin, angle):
-    board.servo[pin].angle = angle
+# Initialize movement variables
+FM1 = FM2 = FM3 = FM4 = FM5 = FM6 = FM7 = FM8 = 0
+Impair_start = False
 
 
-# Function to move a leg
-def move_leg_smooth(leg_name, start_angles, end_angles):
-    board = board1 if leg_name.startswith("right") else board2
-    pins = LEG_SERVOS[leg_name]
+# Stand position
+def up_pos():
+    set_servo_angle("right1", "coxa", 100)
+    set_servo_angle("right1", "femur", 100)  # + = +
+    set_servo_angle("right1", "tibia", 90)  # + = -
 
-    move_smooth(board, pins["coxa"], start_angles["coxa"], end_angles["coxa"], 10)
-    move_smooth(board, pins["femur"], start_angles["femur"], end_angles["femur"], 10)
-    move_smooth(board, pins["tibia"], start_angles["tibia"], end_angles["tibia"], 10)
+    set_servo_angle("right2", "coxa", 95)
+    set_servo_angle("right2", "femur", 110)
+    set_servo_angle("right2", "tibia", 90)
+
+    set_servo_angle("right3", "coxa", 90)
+    set_servo_angle("right3", "femur", 95)
+    set_servo_angle("right3", "tibia", 90)
+
+    set_servo_angle("left1", "coxa", 95)
+    set_servo_angle("left1", "femur", 85)
+    set_servo_angle("left1", "tibia", 90)
+
+    set_servo_angle("left2", "coxa", 90)
+    set_servo_angle("left2", "femur", 85)
+    set_servo_angle("left2", "tibia", 110)
+
+    set_servo_angle("left3", "coxa", 90)
+    set_servo_angle("left3", "femur", 95)
+    set_servo_angle("left3", "tibia", 90)
 
 
-def move_leg(leg_name, angles):
-    board = board1 if leg_name.startswith("right") else board2
-    pins = LEG_SERVOS[leg_name]
+def stand_pos():
+    set_servo_angle("right1", "coxa", 100)
+    set_servo_angle("right1", "femur", 145)  # + = +
+    set_servo_angle("right1", "tibia", 140)  # + = -
 
-    move_servo(board, pins["coxa"], angles["coxa"])
-    move_servo(board, pins["femur"], angles["femur"])
-    move_servo(board, pins["tibia"], angles["tibia"])
+    set_servo_angle("right2", "coxa", 95)
+    set_servo_angle("right2", "femur", 140)
+    set_servo_angle("right2", "tibia", 125)
+
+    set_servo_angle("right3", "coxa", 90)
+    set_servo_angle("right3", "femur", 135)
+    set_servo_angle("right3", "tibia", 150)
+
+    set_servo_angle("left1", "coxa", 95)
+    set_servo_angle("left1", "femur", 135)
+    set_servo_angle("left1", "tibia", 140)
+
+    set_servo_angle("left2", "coxa", 90)
+    set_servo_angle("left2", "femur", 125)
+    set_servo_angle("left2", "tibia", 150)
+
+    set_servo_angle("left3", "coxa", 90)
+    set_servo_angle("left3", "femur", 140)
+    set_servo_angle("left3", "tibia", 145)
 
 
-# Function to set all legs to specific angles
-def set_leg_positions(angles):
-    for leg_name, angle_set in angles.items():
-        move_leg(leg_name, angle_set)
+# Move forward function
 
 
-# Tripod gait function
-def tripod_gait():
-    # Tripod groups
-    TRIPOD_1 = ["right1", "left2", "right3"]
-    TRIPOD_2 = ["left1", "right2", "left3"]
+def move_forward():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 + FM2)
+
+        set_servo_angle("right3", "coxa", 90 + FM2)
+
+        set_servo_angle("left2", "coxa", 90 - FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 - FM4)
+        set_servo_angle("right3", "coxa", 130 - FM4)
+        set_servo_angle("left2", "coxa", 50 + FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 + FM6)
+            set_servo_angle("left1", "coxa", 95 - FM6)
+            set_servo_angle("left3", "coxa", 90 - FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 - FM8)
+            set_servo_angle("left1", "coxa", 55 + FM8)
+            set_servo_angle("left3", "coxa", 50 + FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def move_backward():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 - FM2)
+
+        set_servo_angle("right3", "coxa", 90 - FM2)
+
+        set_servo_angle("left2", "coxa", 90 + FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 + FM4)
+        set_servo_angle("right3", "coxa", 130 + FM4)
+        set_servo_angle("left2", "coxa", 50 - FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 - FM6)
+            set_servo_angle("left1", "coxa", 95 + FM6)
+            set_servo_angle("left3", "coxa", 90 + FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 + FM8)
+            set_servo_angle("left1", "coxa", 55 - FM8)
+            set_servo_angle("left3", "coxa", 50 - FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def rotate_right():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 - FM2)
+
+        set_servo_angle("right3", "coxa", 90 - FM2)
+
+        set_servo_angle("left2", "coxa", 90 - FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 + FM4)
+        set_servo_angle("right3", "coxa", 130 + FM4)
+        set_servo_angle("left2", "coxa", 50 + FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 - FM6)
+            set_servo_angle("left1", "coxa", 95 - FM6)
+            set_servo_angle("left3", "coxa", 90 - FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 + FM8)
+            set_servo_angle("left1", "coxa", 55 + FM8)
+            set_servo_angle("left3", "coxa", 50 + FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def rotate_left():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    if FM1 <= 10:
+        set_servo_angle("right1", "tibia", 140 - FM1 * 2)
+        set_servo_angle("right1", "femur", 145 + FM1 * 3)
+
+        set_servo_angle("right3", "tibia", 150 - FM1 * 2)
+        set_servo_angle("right3", "femur", 135 + FM1 * 3)
+
+        set_servo_angle("left2", "tibia", 150 - FM1 * 2)
+        set_servo_angle("left2", "femur", 125 + FM1 * 3)
+        FM1 += 1
+
+    if FM2 <= 40:
+        set_servo_angle("right1", "coxa", 100 + FM2)
+
+        set_servo_angle("right3", "coxa", 90 + FM2)
+
+        set_servo_angle("left2", "coxa", 90 + FM2)
+        FM2 += 1
+
+    if FM2 > 25 and FM3 <= 10:
+        set_servo_angle("right1", "tibia", 120 + FM3 * 2)
+        set_servo_angle("right1", "femur", 175 - FM3 * 3)
+
+        set_servo_angle("right3", "tibia", 130 + FM3 * 2)
+        set_servo_angle("right3", "femur", 165 - FM3 * 3)
+
+        set_servo_angle("left2", "tibia", 130 + FM3 * 2)
+        set_servo_angle("left2", "femur", 155 - FM3 * 3)
+        FM3 += 1
+
+    if FM2 >= 40:
+        set_servo_angle("right1", "coxa", 140 - FM4)
+        set_servo_angle("right3", "coxa", 130 - FM4)
+        set_servo_angle("left2", "coxa", 50 - FM4)
+        FM4 += 1
+        Impair_start = True
+
+    if FM4 >= 40:
+        FM1 = FM2 = FM3 = FM4 = 0
+
+    if Impair_start:
+        if FM5 <= 10:
+            set_servo_angle("right2", "tibia", 125 - FM5 * 2)
+            set_servo_angle("right2", "femur", 140 + FM5 * 3)
+
+            set_servo_angle("left1", "tibia", 140 - FM5 * 2)
+            set_servo_angle("left1", "femur", 135 + FM5 * 3)
+
+            set_servo_angle("left3", "tibia", 145 - FM5 * 2)
+            set_servo_angle("left3", "femur", 140 + FM5 * 3)
+            FM5 += 1
+
+        if FM6 <= 40:
+            set_servo_angle("right2", "coxa", 95 + FM6)
+            set_servo_angle("left1", "coxa", 95 + FM6)
+            set_servo_angle("left3", "coxa", 90 + FM6)
+            FM6 += 1
+
+        if FM6 > 25 and FM7 <= 10:
+            set_servo_angle("right2", "tibia", 105 + FM7 * 2)
+            set_servo_angle("right2", "femur", 170 - FM7 * 3)
+
+            set_servo_angle("left1", "tibia", 120 + FM7 * 2)
+            set_servo_angle("left1", "femur", 165 - FM7 * 3)
+
+            set_servo_angle("left3", "tibia", 125 + FM7 * 2)
+            set_servo_angle("left3", "femur", 170 - FM7 * 3)
+            FM7 += 1
+
+        if FM6 >= 40:
+            set_servo_angle("right2", "coxa", 135 - FM8)
+            set_servo_angle("left1", "coxa", 55 - FM8)
+            set_servo_angle("left3", "coxa", 50 - FM8)
+            FM8 += 1
+
+        if FM8 >= 40:
+            Impair_start = False
+            FM5 = FM6 = FM7 = FM8 = 0
+
+
+def display_menu():
+    print("\n--- Robot Control Menu ---")
+    print("W: Move Forward")
+    print("S: Move Backward ")
+    print("A: Move Left (not implemented)")
+    print("D: Move Right (not implemented)")
+    print("Ctrl+S: Set Stand Position")
+    print("Ctrl+U: Set Up Position")
+    print("Q: Quit the Program")
+    print("---------------------------\n")
+
+
+def main():
+    global FM1, FM2, FM3, FM4, FM5, FM6, FM7, FM8, Impair_start
+    # Display the control menu
+    display_menu()
 
     while True:
-        # Move Tripod 1: Lift, Swing, Stand
-        for leg in TRIPOD_1:
-            move_leg_smooth(leg, STANCE_ANGLES[leg], LIFT_ANGLES[leg])
-        time.sleep(0.3)
+        if keyboard.is_pressed("w"):
+            move_forward()
+        elif keyboard.is_pressed("s"):
+            move_backward()  # Implement backward or another movement if necessary
+        elif keyboard.is_pressed("a"):
+            rotate_left()  # Implement left movement
+        elif keyboard.is_pressed("d"):
+            rotate_right()  # Implement right movement
+        elif keyboard.is_pressed("j"):
+            print("Setting Stand Position...")
+            stand_pos()
+        elif keyboard.is_pressed("k"):
+            print("Setting Up Position...")
+            up_pos()
+        elif keyboard.is_pressed("c"):
+            print("climb stairs")
+            climb_stair()
+        elif keyboard.is_pressed("q"):
+            print("Exiting program...")
+            break
 
-        for leg in TRIPOD_1:
-            move_leg_smooth(leg, STANCE_ANGLES[leg], SWING_ANGLES[leg])
-        time.sleep(0.3)
+        time.sleep(0.007)  # Small delay to reduce CPU usage
 
-        for leg in TRIPOD_1:
-            move_leg_smooth(leg, LIFT_ANGLES[leg], STANCE_ANGLES[leg])
-        time.sleep(0.3)
-
-        # Move Tripod 2: Lift, Swing, Stand
-        for leg in TRIPOD_2:
-            move_leg_smooth(leg, STANCE_ANGLES[leg], LIFT_ANGLES[leg])
-        time.sleep(0.3)
-
-        for leg in TRIPOD_2:
-            move_leg_smooth(leg, STANCE_ANGLES[leg], SWING_ANGLES[leg])
-        time.sleep(0.3)
-
-        for leg in TRIPOD_2:
-            move_leg_smooth(leg, LIFT_ANGLES[leg], STANCE_ANGLES[leg])
-        time.sleep(0.3)
+        time.sleep(0.007)
 
 
-# Main execution
 if __name__ == "__main__":
-    try:
-        print("Starting hexapod movement...")
-        # Set all legs to initial standing position
-        set_leg_positions(UP_ANGLES)
-        time.sleep(2)
-        # set_leg_positions(STANCE_ANGLES)
-        # time.sleep(2)
-        # Begin tripod gait
-        # tripod_gait()
-    except KeyboardInterrupt:
-        print("Stopping hexapod.")
-
-        print("do you want to de power the servos?")
-        value = input("Enter y/n: ")
-
-        if value == "y":
-            print("De-powering servos...")
-            for i in range(16):
-                board1.servo[i].angle = None
-                board2.servo[i].angle = None
-            print("Servos de-powered.")
-        else:
-            print("Servos still powered.")
+    stand_pos()
+    time.sleep(2)  # Set initial position
+    main()
+#     stand_pos()
