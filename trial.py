@@ -1,6 +1,7 @@
 import time
 from adafruit_servokit import ServoKit
 import keyboard
+from climb import climb_stair
 
 # Initialize ServoKit instances for two PCA9685 boards
 board1 = ServoKit(channels=16, address=0x40)
@@ -472,6 +473,9 @@ def main():
         elif keyboard.is_pressed("k"):
             print("Setting Up Position...")
             up_pos()
+        elif keyboard.is_pressed("c"):
+            print("climb stairs")
+            climb_stair()
         elif keyboard.is_pressed("q"):
             print("Exiting program...")
             break
